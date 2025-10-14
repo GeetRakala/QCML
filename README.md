@@ -4,7 +4,7 @@
 
 **License** :  MIT
 
-- By using ideas developed in the fields of quantum cognition and quantum geometry, a new state of the art intrinsic dimension estimator of high dimensional data is proposed : https://www.nature.com/articles/s41598-025-91676-8
+- By using ideas developed in the fields of quantum cognition and quantum geometry, a new state of the art intrinsic dimension estimator of high dimensional data was proposed : https://www.nature.com/articles/s41598-025-91676-8
 
 - Beyond immediate use as a state-of-the-art intrinsic dimension estimator, this framework is ripe for adopting into quantum computing pipelines as is being attempted by a startup : https://www.qognitiveai.com/
 
