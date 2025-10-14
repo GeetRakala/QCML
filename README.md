@@ -1,5 +1,7 @@
-## A JAX based implementation of the Quantum Cognition Machine Learning based intrinsic dimension estimator.
+## A state-of-the-art intrinsic dimension estimater of high dimensional data using quantum congnition machine learning. Leverages JAX to run on GPU/TPU.
+
 **Author**  : Geet Rakala
+
 **License** :  MIT
 
 - By using ideas developed in the fields of quantum cognition and quantum geometry, a new state of the art intrinsic dimension estimator of high dimensional data is proposed : https://www.nature.com/articles/s41598-025-91676-8
