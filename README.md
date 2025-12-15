@@ -1,4 +1,4 @@
-## A state-of-the-art intrinsic dimension estimater of high dimensional data using quantum congnition machine learning. Leverages JAX to run on GPU/TPU.
+## A state-of-the-art intrinsic dimension estimater of high dimensional data using quantum cognition machine learning. Leverages JAX to run on GPU/TPU.
 
 **Author**  : Geet Rakala
 
