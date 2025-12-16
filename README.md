@@ -33,7 +33,7 @@ This is an open-source reproduction of methods from:
 
 ## Method
 
-Given data $\{x^{(i)}\}_{i=1}^N$ with $x \in \mathbb{R}^E$, the method learns Hermitian matrices $\{A_\mu\}_{\mu=1}^E$ of dimension $H \times H$ by minimizing the reconstruction error. 
+Given a dataset of $N$ points $x \in \mathbb{R}^E$, the method learns a set of Hermitian matrices $A_\mu$ (for $\mu=1 \dots E$) of dimension $H \times H$ by minimizing the reconstruction error.
 
 For each data point $x$, the **error Hamiltonian** is:
 
