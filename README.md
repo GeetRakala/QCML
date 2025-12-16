@@ -6,52 +6,60 @@
 
 ## Overview
 
-**QCML** implements a state-of-the-art **intrinsic dimension estimator** for high-dimensional data, leveraging principles from **quantum cognition** and **quantum geometry**. This framework reformulates the problem of dimensionality estimation by mapping data points to quantum states and analyzing the geometric properties of the resulting Hilbert space.
+This repository implements an intrinsic dimension estimator based on quantum geometric methods. The approach constructs a set of Hermitian operators ${A_\mu}$ that encode the local geometry of a data manifold embedded in high-dimensional space. Each data point is mapped to the ground state of an error Hamiltonian, and the intrinsic dimension is extracted from the eigenvalue spectrum of the quantum metric tensor.
 
-Key advantages include:
-- **High Performance**: Written in **JAX** for seamless hardware acceleration on CPUs, GPUs, and TPUs.
-- **Robust Estimation**: Utilizes a quantum metric derived from the ground state of an error Hamiltonian to estimate intrinsic dimension with high accuracy.
-- **Flexible Optimization**: Supports multiple optimization strategies including analytical gradients, L-BFGS, and pseudo-gradients.
+The implementation uses JAX for automatic differentiation and XLA compilation, enabling execution on CPU, GPU, and TPU backends.
 
-This implementation is based on the research published in **Scientific Reports**:
-> [A quantum cognition approach to intrinsic dimension estimation](https://www.nature.com/articles/s41598-025-91676-8)
+This is an open-source reproduction of methods from:
+> [A quantum cognition approach to intrinsic dimension estimation](https://www.nature.com/articles/s41598-025-91676-8) (Scientific Reports, 2025)
 
-Beyond scientific research, this framework is being adopted for commercial quantum computing pipelines by [Qognitive AI](https://www.qognitiveai.com/).
+## Implementation Details
 
-## Key Features
+**Optimization Methods:**
+- `analytic`: Full analytic gradient via eigenvalue perturbation theory
+- `jaxopt`: L-BFGS quasi-Newton solver
+- `optax`: Adam optimizer with exponential decay scheduling
+- `pseudo`: Pseudo-gradient heuristic (first-order approximation)
 
-- **JAX-Based Implementation**: Fully vectorised and JIT-compiled code ensures maximum performance.
-- **Multiple Solvers**:
-  - **Analytic Gradient**: Uses the exact gradient of the loss function (eigenvalue perturbation theory).
-  - **L-BFGS**: Quasi-Newton method via `jaxopt` for fast convergence.
-  - **Adam**: First-order stochastic optimization via `optax`.
-  - **Pseudo-Gradient**: A heuristic approach for rapid approximation.
-- **Parametrization Strategies**:
-  - **Upper Triangular**: Standard Cholesky-like decomposition for Hermitian matrices.
-  - **Pauli Basis**: Decomposition into Pauli matrices for quantum-native representations.
-- **Data Generation**: Built-in synthetic datasets (Sphere, Cubic, Campadelli) for benchmarking.
+**Matrix Parametrizations:**
+- `upper`: Upper triangular + diagonal (Cholesky-like for Hermitian matrices)
+- `pauli`: Expansion in generalized Pauli basis
 
-## Mathematical Foundation
+**Datasets:**
+- Hypersphere manifolds (`sphere`, `sphere_other`)
+- Hypercube boundaries (`cubic`, `cubic_other`)
+- Campadelli benchmark manifolds (`campadelli_beta`, `campadelli_n`)
 
-The core idea is to learn a set of Hermitian operators $\{A_\mu\}$ such that the mapping from a high-dimensional data point $x \in \mathbb{R}^E$ to a quantum state $|\psi_0(x)\rangle$ preserves local geometry. The state $|\psi_0(x)\rangle$ is defined as the ground state of an **Error Hamiltonian**:
 
-$$ H_E(x) = \sum_{\mu=1}^E (A_\mu - x_\mu I)^2 $$
+## Method
 
-The intrinsic dimension is then estimated from the spectrum of the **Quantum Metric tensor** $g$, which is derived from the perturbation of the ground state:
+Given data $\{x^{(i)}\}_{i=1}^N$ with $x \in \mathbb{R}^E$, the method learns Hermitian matrices $\{A_\mu\}_{\mu=1}^E$ of dimension $H \times H$ by minimizing the reconstruction error. 
 
-$$ g_{\mu\nu} = 2 \text{Re} \sum_{n \neq 0} \frac{\langle \psi_0 | \partial_\mu H | \psi_n \rangle \langle \psi_n | \partial_\nu H | \psi_0 \rangle}{(E_n - E_0)^2} $$
+For each data point $x$, the **error Hamiltonian** is:
 
-For a detailed derivation of the pseudo-gradient approach, see `gradient.pdf` included in this repository.
+$$ H_E(x) = \frac{1}{2}\sum_{\mu=1}^E (A_\mu - x_\mu I)^2 $$
+
+The ground state $|\psi_0(x)\rangle$ satisfies $H_E(x)|\psi_0(x)\rangle = E_0|\psi_0(x)\rangle$ where $E_0$ is the minimum eigenvalue.
+
+The reconstruction is $y_\mu = \langle \psi_0 | A_\mu | \psi_0 \rangle$, and the loss is $L = \sum_i ||y^{(i)} - x^{(i)}||^2$.
+
+The **quantum metric** is computed from excited state contributions:
+
+$$ g_{\mu\nu} = 2 \text{Re} \sum_{n \geq 1} \frac{\langle \psi_0 | A_\mu | \psi_n \rangle \langle \psi_n | A_\nu | \psi_0 \rangle}{E_n - E_0} $$
+
+The intrinsic dimension is estimated from the spectrum of $g$ by identifying the spectral gap where eigenvalues transition from $O(1)$ to $O(\epsilon)$.
+
+See `gradient.pdf` for the analytic gradient derivation.
+
 
 ## Dependencies
-
-Ensure you have Python installed. Install the dependencies using pip:
 
 ```bash
 pip install jax jaxlib jaxopt optax matplotlib numpy
 ```
 
-*Note: For GPU/TPU support, please follow the specific [JAX installation guide](https://jax.readthedocs.io/en/latest/installation.html).*
+For GPU/TPU: see [JAX installation](https://jax.readthedocs.io/en/latest/installation.html).
+
 
 ## Usage
 
@@ -113,24 +121,14 @@ I_dims, Y_embed, E0s, G_eigs = results
 print("Estimated Intrinsic Dimension:", I_dims.mean())
 ```
 
-### Supported Datasets
 
-The `datasets_jax.py` module provides several synthetic datasets for validation:
-- `sphere` / `sphere_other`: Hyperspheres tailored for specific dimensions.
-- `cubic` / `cubic_other`: Hypercubes.
-- `campadelli_beta` / `campadelli_n`: Complex manifolds from Campadelli et al. benchmark.
+## Files
 
-## Project Structure
+- `qcml.py`: Core implementation (parametrizations, loss functions, solvers, dimension estimator, plotting)
+- `datasets_jax.py`: Synthetic dataset generators
+- `plots.pdf`: Benchmark results
+- `gradient.pdf`: Analytic gradient derivation
 
-- `qcml.py`: The core library containing:
-    - Matrix parametrization logic (`upper`, `pauli`).
-    - Loss functions and gradients (analytic & pseudo).
-    - Training loops (`train_A_array_...`).
-    - Intrinsic dimension estimator (`I_dimension_estimator_jax`).
-    - Plotting utilities.
-- `datasets_jax.py`: Functions to generate synthetic high-dimensional datasets.
-- `plots.pdf`: Sample output plots comparing results to the white paper.
-- `gradient.pdf`: Mathematical derivation of the gradient descent update rules.
 
 ## References
 
