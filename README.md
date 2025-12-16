@@ -13,6 +13,9 @@ The implementation uses JAX for automatic differentiation and XLA compilation, e
 This is an open-source reproduction of methods from:
 > [A quantum cognition approach to intrinsic dimension estimation](https://www.nature.com/articles/s41598-025-91676-8) (Scientific Reports, 2025)
 
+> [!NOTE]
+> For a detailed technical reference of the codebase, see **[DOCUMENTATION.md](DOCUMENTATION.md)**.
+
 ## Implementation Details
 
 **Optimization Methods:**
@@ -126,6 +129,7 @@ print("Estimated Intrinsic Dimension:", I_dims.mean())
 
 - `qcml.py`: Core implementation (parametrizations, loss functions, solvers, dimension estimator, plotting)
 - `datasets_jax.py`: Synthetic dataset generators
+- `DOCUMENTATION.md`: Detailed API and logic documentation
 - `plots.pdf`: Benchmark results
 - `gradient.pdf`: Analytic gradient derivation
 
