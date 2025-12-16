@@ -1,107 +1,131 @@
-# QCML Documentation
+# QCML API Reference
 
-This document provides a detailed technical reference for the **QCML** codebase, specifically the core logic in `qcml.py` and the data generation utilities in `datasets_jax.py`.
+Technical documentation for `qcml.py` and `datasets_jax.py`.
 
-## Module: `qcml.py`
+## Core Functions (`qcml.py`)
 
-The `qcml.py` file contains the main implementation of the Quantum Cognition Machine Learning framework for intrinsic dimension estimation. It relies heavily on **JAX** for high-performance linear algebra and automatic differentiation.
+### Error Hamiltonian Construction
 
-### Core Physics Logic
+**`error_hamiltonian_jax(X_point, A_array)`**
 
-These functions implement the quantum geometric mapping and metric calculation.
+Builds the error Hamiltonian $H_E(x) = \frac{1}{2}\sum_{\mu=1}^E (A_\mu - x_\mu I)^2$.
 
-#### `error_hamiltonian_jax(X_point, A_array)`
-Constructs the Error Hamiltonian $H_E(x)$ for a single data point.
-*   **Args**:
-    *   `X_point`: Data point vector $x \in \mathbb{R}^E$.
-    *   `A_array`: Array of Hermitian matrices $\{A_\mu\}$, shape $(E, H, H)$.
-*   **Returns**: $H \times H$ Hermitian matrix.
-*   **Math**: $H_E(x) = \frac{1}{2} \sum_\mu (A_\mu - x_\mu I)^2$.
+- Input: `X_point` (shape `(E,)`), `A_array` (shape `(E, H, H)`)
+- Output: Hermitian matrix (shape `(H, H)`)
+- Uses `einsum` for vectorized computation over $\mu$
 
-#### `compute_ground_state_jax(X_point, A_array)`
-Diagonalizes the Error Hamiltonian to find the ground state.
-*   **Returns**:
-    *   `E_eigvec_0`: Ground state eigenvector $|\psi_0\rangle$.
-    *   `E_eigval_0`: Ground state energy $E_0$.
-    *   `E_eigvals`: Full eigenvalue spectrum.
-    *   `E_eigvecs`: Full eigenvector basis.
+**`compute_ground_state_jax(X_point, A_array)`**
 
-#### `point_mapping_jax(psi, A_array)`
-Maps a quantum state back to the embedding space (reconstruction).
-*   **Math**: $y_\mu = \text{Re}(\langle \psi | A_\mu | \psi \rangle)$.
+Diagonalizes $H_E$ via `jnp.linalg.eigh`.
 
-#### `quantum_metric_jax(E_eigvec_0, ..., A_array)`
-Computes the quantum metric tensor $g$ using perturbation theory.
-*   **Math**: $g_{\mu\nu} = 2 \text{Re} \sum_{n \neq 0} \frac{\langle \psi_0 | A_\mu | \psi_n \rangle \langle \psi_n | A_\nu | \psi_0 \rangle}{E_n - E_0}$.
-*   **Note**: This metric measures the sensitivity of the ground state to changes in the manifold parameters.
+Returns: `(eigvec_0, eigval_0, eigvals, eigvecs)` where ground state is `eigvec_0` with energy `eigval_0`.
 
-#### `estimate_single_point_jax(X_point, A_array)`
-Estimates the intrinsic dimension for a single point.
-*   **Logic**:
-    1.  Computes ground state and quantum metric.
-    2.  Finds eigenvalues of the metric $g$.
-    3.  Identifies the spectral gap (largest ratio between consecutive sorted eigenvalues).
-    4.  Intrinsic dimension $d = E - \text{gap\_index}$.
+**`point_mapping_jax(psi, A_array)`**
 
-### Optimization Solvers
+Reconstruction operator: $y_\mu = \text{Re}\langle \psi | A_\mu | \psi \rangle$.
 
-The framework provides multiple strategies to train the matrices $\{A_\mu\}$ by minimizing the reconstruction loss $L = \sum_i ||y^{(i)} - x^{(i)}||^2$.
+**`quantum_metric_jax(E_eigvec_0, E_eigval_0, E_eigvals, E_eigvecs, A_array)`**
 
-#### `train_A_array_analytic_jax(...)`
-Uses the **exact analytical gradient** derived from the Hellmann-Feynman theorem and eigenvalue perturbation.
-*   **Key Args**: `lr`, `l2_lambda` (regularization).
-*   **Pros**: Most theoretically accurate.
-*   **Cons**: Computationally expensive due to full eigendecomposition per step.
+Computes the Fubini-Study metric via first-order perturbation theory:
 
-#### `train_A_array_LBFGS(...)`
-Uses `jaxopt.LBFGS` for quasi-Newton optimization.
-*   **Pros**: Often faster convergence than simple gradient descent.
-*   **Note**: The objective function must be JIT-compilable.
+$$g_{\mu\nu} = 2 \text{Re} \sum_{n \geq 1} \frac{\langle \psi_0 | A_\mu | \psi_n \rangle \langle \psi_n | A_\nu | \psi_0 \rangle}{E_n - E_0}$$
 
-#### `train_A_array_optax(...)`
-Uses the **Adam** optimizer from the `optax` library.
-*   **Key Args**: `decay_rate`, `transition_steps` (for exponential learning rate schedule), `grad_clip_norm`.
-*   **Pros**: robust standard for deep learning tasks.
+This is the pullback of the Hilbert space geometry to the parameter manifold. Regularization constant $\epsilon = 10^{-20}$ prevents division by zero for degenerate states.
 
-#### `train_A_array_pseudo_jax(...)`
-Uses a **pseudo-gradient** heuristic approximation: $\nabla \approx 2(y - x) |\psi_0\rangle\langle\psi_0|$.
-*   **Pros**: Very fast iteration.
-*   **Cons**: Approximation may not always converge to the global optimum.
+**`estimate_single_point_jax(X_point, A_array)`**
 
-### Parametrization
+Intrinsic dimension estimator:
+1. Compute $g$ and diagonalize
+2. Sort eigenvalues $\lambda_1 \leq \lambda_2 \leq \dots \leq \lambda_E$
+3. Find $\gamma = \arg\max_i \frac{\lambda_{i+1}}{\lambda_i}$ (spectral gap)
+4. Return $d = E - \gamma$
 
-Two methods are available to ensure the matrices $A_\mu$ remain Hermitian:
-
-1.  **"upper"**: Parametrizes the upper triangular part (complex) and diagonal (real).
-    *   `matrix_from_upper`: Reconstructs the full matrix.
-2.  **"pauli"**: Expands the matrix in a generalized Pauli basis.
-    *   `generate_pauli_basis`: Creates the basis tensors.
-    *   `matrix_from_pauli_params`: Reconstructs via linear combination.
-
-### Experiment Runner
-
-#### `run_experiment(...)`
-The high-level entry point for running a complete pipeline.
-1.  Generates synthetic data (via `datasets_jax`).
-2.  Initializes parameters ($A_\mu$).
-3.  Runs the selected Training loop.
-4.  Estimates dimensions on the trained model.
-5.  Generates and saves plots.
+Rationale: On a $d$-dimensional manifold, $g$ has rank $d$, so $E-d$ eigenvalues are $O(\epsilon)$.
 
 ---
 
-## Module: `datasets_jax.py`
+## Optimization Methods
 
-Generates synthetic high-dimensional data points $x \in \mathbb{R}^{E}$ that lie on a manifold of intrinsic dimension $I$.
+All methods minimize $\mathcal{L} = \frac{1}{N}\sum_{i=1}^N \|y^{(i)} - x^{(i)}\|^2 + \lambda \|A\|_F^2$.
 
-### Functions
+### `train_A_array_analytic_jax`
 
-#### `gen_sphere_data(..., E_dim, I_dim)`
-Generates points on a unit hypersphere $S^I$ embedded in $\mathbb{R}^E$.
-*   Dimensions $I < E$. The extra dimensions are padded with zeros (plus noise).
+Gradient computed via Hellmann-Feynman theorem:
 
-#### `gen_cubic_data(..., E_dim, I_dim)`
-Generates points on a hypercube.
+$$\frac{\partial \mathcal{L}}{\partial A_\mu} = \frac{2}{N}\sum_i (y_\mu^{(i)} - x_\mu^{(i)}) |\psi_0^{(i)}\rangle\langle\psi_0^{(i)}| + \text{correction terms}$$
 
-#### `gen_campadelli_beta_data(...)` & `gen_campadelli_n_data(...)`
-Generates complex manifold structures used in the *Campadelli et al.* benchmark papers, involving trigonometric mappings and beta distributions.
+Correction terms from $\partial |\psi_0\rangle / \partial A_\mu$ using degenerate perturbation theory (see `gradient.pdf`).
+
+### `train_A_array_LBFGS`
+
+Wrapper around `jaxopt.LBFGS`. Uses JAX autodiff for gradient. Memory efficient for $H \gg 10$.
+
+### `train_A_array_optax`
+
+Adam with exponential decay: $\alpha(t) = \alpha_0 \cdot \rho^{t/T}$ where $\rho$ = `decay_rate`, $T$ = `transition_steps`.
+
+Gradient clipping via `optax.clip_by_global_norm(grad_clip_norm)`.
+
+### `train_A_array_pseudo_jax`
+
+Ignores excited state corrections:
+
+$$\frac{\partial \mathcal{L}}{\partial A_\mu} \approx \frac{2}{N}\sum_i (y_\mu^{(i)} - x_\mu^{(i)}) |\psi_0^{(i)}\rangle\langle\psi_0^{(i)}|$$
+
+Fastest iteration but may stall far from optimum.
+
+---
+
+## Matrix Parametrization
+
+Hermitian matrices have $H^2$ real degrees of freedom. Two parametrizations:
+
+### Upper Triangular (`upper`)
+
+Store $H(H+1)/2$ complex parameters: $H(H-1)/2$ off-diagonal + $H$ diagonal (real).
+
+- `upper_from_matrix`: Extract parameters via `triu_indices(H, k=0)`
+- `matrix_from_upper`: Reconstruct $A = U + U^\dagger - \text{diag}(U)$ where $U$ is upper triangular
+
+### Pauli Basis (`pauli`)
+
+Expand in Hermitian basis: $A = \sum_{k=1}^{H^2} c_k \sigma_k$ where $\{\sigma_k\}$ are:
+- $H$ diagonal matrices $E_{ii}$
+- $H(H-1)/2$ symmetric: $E_{ij} + E_{ji}$
+- $H(H-1)/2$ antisymmetric: $i(E_{ij} - E_{ji})$
+
+All coefficients $c_k \in \mathbb{R}$.
+
+- `generate_pauli_basis`: Constructs $\{\sigma_k\}$ (shape `(H^2, H, H)`)
+- `matrix_from_pauli_params`: Computes $A$ via `tensordot`
+
+---
+
+## Datasets (`datasets_jax.py`)
+
+All functions return arrays of shape `(N_points, E_dim)`.
+
+**`gen_sphere_data(key, N_points, E_dim, I_dim, noise)`**
+
+Samples uniformly from $S^{I} \subset \mathbb{R}^{I+1}$, embeds in $\mathbb{R}^E$ by zero-padding dimensions $I+2, \dots, E$.
+
+**`gen_cubic_data(key, N_points, E_dim, I_dim, noise)`**
+
+Samples from boundary of $[0,1]^{I+1}$ (each face contains $\sim N/(2(I+1))$ points).
+
+**`gen_campadelli_beta_data(key, N_points, E_dim, I_dim, noise, alpha, beta)`**
+
+Constraint: `E_dim = 4 * I_dim`.
+
+Samples $u \sim \text{Beta}(\alpha, \beta)$, maps to:
+$$[u \sin(\cos(2\pi u)), u \cos(\sin(2\pi u)), u \sin(\cos(2\pi u)), u \cos(\sin(2\pi u))]$$
+repeated for each dimension.
+
+**`gen_campadelli_n_data(key, N_points, E_dim, I_dim, noise)`**
+
+Constraint: `E_dim = 4 * I_dim`.
+
+Samples $u \sim \mathcal{U}(0,1)^{I}$, applies:
+$$v_i = \tan(u_i \cos(u_{I-i})), \quad w_i = \arctan(u_{I-i} \sin(u_i))$$
+
+Concatenates $[v, w, v, w]$.
