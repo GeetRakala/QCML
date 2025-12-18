@@ -16,64 +16,79 @@ st.title("QCML Experiment Dashboard")
 # --- Sidebar: Run Experiment ---
 st.sidebar.header("Run New Experiment")
 
-with st.sidebar.form("run_experiment_form"):
-    st.subheader("Core Parameters")
-    dataset_type = st.selectbox("Dataset Type", ["sphere", "sphere_other", "cubic", "cubic_other", "campadelli_beta", "campadelli_n"])
-    solver = st.selectbox("Solver", ["LBFGS", "analytic", "optax", "pseudo", "jaxopt"])
-    parametrization = st.selectbox("Parametrization", ["upper", "pauli"])
+# --- Sidebar: Run Experiment ---
+st.sidebar.header("Run New Experiment")
+
+# No form to prevent "Enter" from triggering submission
+st.sidebar.subheader("Core Parameters")
+dataset_type = st.sidebar.selectbox("Dataset Type", ["sphere", "sphere_other", "cubic", "cubic_other", "campadelli_beta", "campadelli_n"])
+
+# Dataset dimension info logic
+dataset_dims_info = {
+    "sphere": (3, 2),
+    "sphere_other": (9, 6),
+    "cubic": (18, 17),
+    "cubic_other": (10, 5),
+    "campadelli_beta": (40, 10),
+    "campadelli_n": (72, 18)
+}
+if dataset_type in dataset_dims_info:
+    e_dim_exp, i_dim_exp = dataset_dims_info[dataset_type]
+    st.sidebar.info(f"**Expected Dims**: E_dim={e_dim_exp}, I_dim={i_dim_exp}")
+
+solver = st.sidebar.selectbox("Solver", ["LBFGS", "analytic", "optax", "pseudo", "jaxopt"])
+parametrization = st.sidebar.selectbox("Parametrization", ["upper", "pauli"])
+
+H_dim = st.sidebar.number_input("H_dim (Hilbert Dim)", min_value=1, value=16)
+N_points = st.sidebar.number_input("N_points", min_value=10, value=1000)
+epochs = st.sidebar.number_input("Epochs", min_value=1, value=100)
+seed = st.sidebar.number_input("Seed", value=137)
+
+st.sidebar.subheader("Hyperparameters")
+col1, col2 = st.sidebar.columns(2)
+with col1:
+    learning_rate = st.number_input("Learning Rate", value=0.9, format="%.4f")
+    l2_lambda = st.number_input("L2 Lambda", value=1e-4, format="%.1e")
+with col2:
+    A_init_scale = st.number_input("Init Scale (A)", value=5.0)
+    noise_level = st.slider("Noise Level", 0.0, 1.0, 0.0, 0.05)
+
+st.sidebar.subheader("Optax Specific")
+col3, col4 = st.sidebar.columns(2)
+with col3:
+    grad_clip_norm = st.number_input("Grad Clip", value=1.0)
+with col4:
+    transition_steps = st.number_input("Transition Steps", value=25)
+    decay_rate = st.number_input("Decay Rate", value=0.99)
+
+if st.sidebar.button("Run Experiment"):
+    config = {
+        "solver": solver,
+        "dataset_type": dataset_type,
+        "parametrization": parametrization,
+        "N_points": N_points,
+        "H_dim": H_dim,
+        "epochs": epochs,
+        "learning_rate": learning_rate,
+        "l2_lambda": l2_lambda,
+        "noise_level": noise_level,
+        "seed": seed,
+        "output_dir": "plots",
+        "A_init_scale": A_init_scale,
+        "grad_clip_norm": grad_clip_norm,
+        "transition_steps": transition_steps,
+        "decay_rate": decay_rate
+    }
     
-    H_dim = st.number_input("H_dim (Hilbert Dim)", min_value=1, value=16)
-    N_points = st.number_input("N_points", min_value=10, value=1000)
-    epochs = st.number_input("Epochs", min_value=1, value=100)
-    seed = st.number_input("Seed", value=137)
-
-    st.subheader("Hyperparameters")
-    col1, col2 = st.columns(2)
-    with col1:
-        learning_rate = st.number_input("Learning Rate", value=0.9, format="%.4f")
-        l2_lambda = st.number_input("L2 Lambda", value=1e-4, format="%.1e")
-    with col2:
-        A_init_scale = st.number_input("Init Scale (A)", value=5.0)
-        noise_level = st.slider("Noise Level", 0.0, 1.0, 0.0, 0.05)
-
-    st.subheader("Optax Specific")
-    col3, col4 = st.columns(2)
-    with col3:
-        grad_clip_norm = st.number_input("Grad Clip", value=1.0)
-    with col4:
-        transition_steps = st.number_input("Transition Steps", value=25)
-        decay_rate = st.number_input("Decay Rate", value=0.99)
-    
-    submitted = st.form_submit_button("Run Experiment")
-
-    if submitted:
-        config = {
-            "solver": solver,
-            "dataset_type": dataset_type,
-            "parametrization": parametrization,
-            "N_points": N_points,
-            "H_dim": H_dim,
-            "epochs": epochs,
-            "learning_rate": learning_rate,
-            "l2_lambda": l2_lambda,
-            "noise_level": noise_level,
-            "seed": seed,
-            "output_dir": "plots",
-            "A_init_scale": A_init_scale,
-            "grad_clip_norm": grad_clip_norm,
-            "transition_steps": transition_steps,
-            "decay_rate": decay_rate
-        }
-        
-        with st.spinner(f"Running {solver} on {dataset_type}..."):
-            try:
-                main.run_experiment(config)
-                st.success("Experiment finished! Refreshing results...")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Experiment failed: {e}")
-                import traceback
-                st.code(traceback.format_exc())
+    with st.spinner(f"Running {solver} on {dataset_type}..."):
+        try:
+            main.run_experiment(config)
+            st.success("Experiment finished! Refreshing results...")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Experiment failed: {e}")
+            import traceback
+            st.code(traceback.format_exc())
 
 # --- Main Area: View Results ---
 
@@ -100,6 +115,9 @@ def load_experiments(plots_dir="plots"):
                     "L2": float(config.get("l2_lambda", 0.0)),
                     "Scale": float(config.get("A_init_scale", 0.0)),
                     "Epochs": int(config.get("epochs", 0)),
+                    "N_points": int(config.get("N_points", 0)),
+                    "T_steps": int(config.get("transition_steps", 0)),
+                    "Decay": float(config.get("decay_rate", 0.0)),
                     "Path": root
                 }
                 experiments.append(row)
@@ -125,11 +143,16 @@ if df_experiments.empty:
 else:
     # Interactive Table
     # Create a descriptive display label
-    df_experiments["ID"] = df_experiments.apply(
-        lambda x: (f"{x['Dataset']} | {x['Solver']} | {x['Param']} | "
-                   f"H{x['H_dim']} | N{x['Noise']:.2f} | "
-                   f"LR{x['LR']} | L2{x['L2']:.1e} | Sc{x['Scale']}"), axis=1
-    )
+    def generate_label(x):
+        label = (f"{x['Dataset']} | {x['Solver']} | {x['Param']} | "
+                 f"H_dim: {x['H_dim']} | Noise: {x['Noise']:.2f} | "
+                 f"LearnRate: {x['LR']} | L2_Lambda: {x['L2']:.1e} | InitScale: {x['Scale']} | "
+                 f"Epochs: {x['Epochs']} | Points: {x['N_points']}")
+        if x['Solver'] == 'optax':
+            label += f" | T_steps: {x['T_steps']} | Decay: {x['Decay']}"
+        return label
+
+    df_experiments["ID"] = df_experiments.apply(generate_label, axis=1)
     
     unique_ids = df_experiments["ID"].unique()
     selected_exp_id = st.selectbox("Select Experiment to View", unique_ids)

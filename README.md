@@ -100,6 +100,9 @@ config["epochs"] = 1000
 run_experiment(config, noise_level=0.01, seed=42)
 ```
 
+Results are saved to `plots/` with a hierarchical structure. Each run gets a unique directory based on its configuration hash to prevent overwrites.
+
+
 ### Dashboard
 
 You can explore results and run new experiments using the interactive Streamlit dashboard. It allows you to:

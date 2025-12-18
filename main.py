@@ -4,6 +4,8 @@ import jax.numpy as jnp
 import numpy as np
 import os
 import argparse
+import hashlib
+import json
 from src.data import get_data_generator
 from src.models import (
     initialize_A_array_jax, upper_from_matrix, initialize_A_array_pauli_jax,
@@ -48,8 +50,16 @@ def run_experiment(run_config):
     E_dim = dataset_dims.get(dataset_type, 3) # Default to 3 if unknown
 
     # Hierarchical structure:
-    # plots/dataset/solver/H{}_lr{}_l2{}/noise_{}
-    param_str = f"H{H_dim}_lr{lr}_l2{l2_lambda:.1e}"
+    # plots/dataset/solver/H{}_lr{}_l2{}_{hash}/noise_{}
+    
+    # Compute a stable hash of the configuration to ensure uniqueness
+    # We filter out 'output_dir' and 'seed' from the hash if we want seed repeats to be same folder? 
+    # The user probably wants different seeds to be different runs? usually yes.
+    # Let's include everything relevant to the physics/training.
+    config_str = json.dumps(run_config, sort_keys=True)
+    config_hash = hashlib.md5(config_str.encode("utf-8")).hexdigest()[:6]
+
+    param_str = f"H{H_dim}_lr{lr}_l2{l2_lambda:.1e}_{config_hash}"
     save_folder = os.path.join(
         run_config.get('output_dir', 'plots'), 
         dataset_type, 
