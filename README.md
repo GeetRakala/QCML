@@ -69,7 +69,7 @@ uv sync
 
 The easiest way to explore QCML is via the interactive **Streamlit Dashboard**.
 
-![QCML Dashboard](file:///Users/geet/.gemini/antigravity/brain/5fdf0d30-9d69-4fcc-a9b6-e28b56ea0abd/dashboard_screenshot_1766057948189.png)
+![QCML Dashboard](assets/dashboard_screenshot.png)
 
 It allows you to:
 - **Visualize** experiment results with an interactive, sortable table.
