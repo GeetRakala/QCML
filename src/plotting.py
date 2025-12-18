@@ -1,20 +1,23 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import textwrap
 
 # Set professional style parameters
 plt.rcParams.update({
     'font.size': 10,
-    'axes.titlesize': 12,
+    'axes.titlesize': 11,
     'axes.labelsize': 10,
-    'xtick.labelsize': 8,
-    'ytick.labelsize': 8,
-    'legend.fontsize': 8,
-    'figure.titlesize': 14,
+    'xtick.labelsize': 9,
+    'ytick.labelsize': 9,
+    'legend.fontsize': 9,
+    'figure.titlesize': 13,
     'figure.dpi': 300,
     'grid.alpha': 0.5,
+    'savefig.bbox': 'tight',
+    'savefig.pad_inches': 0.1
 })
-# Try to use a clean style if available, otherwise fallback to default with above params
+# Try to use a clean style if available
 try:
     plt.style.use('seaborn-v0_8-paper')
 except OSError:
@@ -42,8 +45,9 @@ def plot_point_cloud(Y_array_np, X_array_np, E_eigval_0_array_np, noise_level, s
     ncols = int(np.ceil(np.sqrt(num_pairs)))
     nrows = int(np.ceil(num_pairs / ncols))
 
-    # Figure size: Scale with number of plots but keep feasible
-    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 4, nrows * 4), constrained_layout=True)
+    # Figure size: Scale with number of plots. 
+    # Use constrained_layout=True for automatic spacing adjustment
+    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 4.5, nrows * 4.5), constrained_layout=True)
     if num_pairs == 1:
         axes = np.array([axes])
     axes = np.array(axes).flatten()
@@ -55,14 +59,14 @@ def plot_point_cloud(Y_array_np, X_array_np, E_eigval_0_array_np, noise_level, s
         
         # Plot embedded points
         scatter = ax.scatter(Y_array_np[:, dim1], Y_array_np[:, dim2], c=1 - E_eigval_0_norm,
-                   cmap='magma', label='Embedded', s=15, alpha=0.8, edgecolors='none')
+                   cmap='magma', label='Embedded', s=20, alpha=0.9, edgecolors='none')
 
         # Plot original data (projected) if available, lighter
         if X_array_np is not None:
              # Ensure dims exist
              if X_array_np.shape[1] > dim2:
                 ax.scatter(X_array_np[:, dim1], X_array_np[:, dim2], color='cyan',
-                           alpha=0.2, label='Original', s=5)
+                           alpha=0.15, label='Original', s=10)
 
         ax.set_xlabel(f"$y_{{{dim1+1}}}$")
         ax.set_ylabel(f"$y_{{{dim2+1}}}$")
@@ -80,11 +84,14 @@ def plot_point_cloud(Y_array_np, X_array_np, E_eigval_0_array_np, noise_level, s
     for i in range(num_pairs, len(axes)):
         fig.delaxes(axes[i])
 
-    plt.suptitle(f"Point Cloud (Noise={noise_level} | {dataset_type} | {solver})", fontweight='bold')
+    # Wrap long titles to avoid cutoff
+    title_str = f"Point Cloud (Noise={noise_level} | {dataset_type} | {solver})"
+    wrapped_title = "\n".join(textwrap.wrap(title_str, width=60))
+    plt.suptitle(wrapped_title, fontweight='bold')
 
     if save and filename:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
-        plt.savefig(filename, dpi=300) # High resolution
+        plt.savefig(filename, dpi=300, bbox_inches='tight')
         plt.close()
     else:
         plt.show()
@@ -118,7 +125,7 @@ def plot_mean_eigenvalues(G_eigvals_array_np, noise_level, solver, dataset_type,
     ax2.set_ylabel("Mean Eigenvalue (Log)", color='tab:gray')
     ax2.tick_params(axis='y', labelcolor='tab:gray')
 
-    ax1.set_title(f"Metric Eigenvalues (Noise={noise_level})", fontweight='bold')
+    ax1.set_title(f"Metric Eigenvalues\n(Noise={noise_level} | {dataset_type})", fontweight='bold')
     
     # Combined legend
     lines1, labels1 = ax1.get_legend_handles_labels()
@@ -127,7 +134,7 @@ def plot_mean_eigenvalues(G_eigvals_array_np, noise_level, solver, dataset_type,
 
     if save and filename:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
-        plt.savefig(filename, dpi=300)
+        plt.savefig(filename, dpi=300, bbox_inches='tight')
         plt.close()
     else:
         plt.show()
@@ -145,7 +152,7 @@ def plot_quantum_metric_spectra(G_eigvals_array, noise_level, save=False, filena
     
     for i in range(E_dim):
         plt.plot(range(num_points), G_eigvals_array_np[:, i], 
-                 marker=None, linewidth=1.0, color=colors[i], label=f"$\lambda_{{{i+1}}}$")
+                 marker=None, linewidth=1.0, color=colors[i], label=f"$\\lambda_{{{i+1}}}$")
 
     plt.title(f"Metric Spectra (Noise={noise_level})", fontweight='bold')
     plt.xlabel("Data Point Index")
@@ -155,7 +162,8 @@ def plot_quantum_metric_spectra(G_eigvals_array, noise_level, save=False, filena
 
     if save and filename:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
-        plt.savefig(filename, dpi=300)
+        # Use raw string for latex to avoid warning
+        plt.savefig(filename, dpi=300, bbox_inches='tight')
         plt.close()
     else:
         plt.show()
@@ -182,7 +190,7 @@ def plot_I_dim_array(I_dim_array, noise_level, save=False, filename=None):
 
     if save and filename:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
-        plt.savefig(filename, dpi=300)
+        plt.savefig(filename, dpi=300, bbox_inches='tight')
         plt.close()
     else:
         plt.show()
@@ -213,7 +221,7 @@ def plot_I_dim_array_hist(I_dim_array, noise_level, save=False, filename=None):
 
     if save and filename:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
-        plt.savefig(filename, dpi=300)
+        plt.savefig(filename, dpi=300, bbox_inches='tight')
         plt.close()
     else:
         plt.show()
