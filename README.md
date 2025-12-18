@@ -63,14 +63,29 @@ uv sync
 ```
 
 
-
 ## Usage
 
-The main library is contained in `qcml.py`.
+### Dashboard (Recommended)
 
-### Running the Script
+The easiest way to explore QCML is via the interactive **Streamlit Dashboard**.
 
-You can run the reproduction script using `uv`:
+![QCML Dashboard](file:///Users/geet/.gemini/antigravity/brain/5fdf0d30-9d69-4fcc-a9b6-e28b56ea0abd/dashboard_screenshot_1766057948189.png)
+
+It allows you to:
+- **Visualize** experiment results with an interactive, sortable table.
+- **Track Progress** with real-time loss charts and progress bars during training.
+- **Manage** experiments (view configs, delete runs).
+- **Configure** and launch new runs with full parameter control via the sidebar.
+
+**Run the dashboard:**
+
+```bash
+uv run streamlit run dashboard.py
+```
+
+### Command Line Usage
+
+You can also run the reproduction script directly using `uv`:
 
 ```bash
 uv run main.py
@@ -80,7 +95,7 @@ This will run experiments as configured in `config/default_config.yaml`.
 
 ### Library Usage
 
-You can also import the `run_experiment` function from `main_reproduction.py` to run custom experiments programmatically:
+You can also import the `run_experiment` function from `main.py` (formerly `main_reproduction.py`) to run custom experiments programmatically:
 
 ```python
 import jax
@@ -101,17 +116,6 @@ run_experiment(config, noise_level=0.01, seed=42)
 ```
 
 Results are saved to `plots/` with a hierarchical structure. Each run gets a unique directory based on its configuration hash to prevent overwrites.
-
-
-### Dashboard
-
-You can explore results and run new experiments using the interactive Streamlit dashboard. It allows you to:
-- **Visualize** experiment results and plots.
-- **Configure** and launch new runs with full parameter control via the sidebar.
-
-```bash
-uv run streamlit run dashboard.py
-```
 
 
 ## Files
