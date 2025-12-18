@@ -97,7 +97,7 @@ This will run experiments as configured in `config/default_config.yaml`.
 
 ### Library Usage
 
-You can also import the `run_experiment` function from `main.py` (formerly `main_reproduction.py`) to run custom experiments programmatically:
+You can also import the `run_experiment` function from `main.py` into a jupyter notebook to run custom experiments:
 
 ```python
 import jax
