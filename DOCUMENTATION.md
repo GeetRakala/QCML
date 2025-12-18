@@ -1,8 +1,8 @@
 # QCML API Reference
 
-Technical documentation for `qcml.py` and `datasets_jax.py`.
+Technical documentation for the QCML codebase.
 
-## Core Functions (`qcml.py`)
+## Core Functions (`src/models.py`)
 
 ### Error Hamiltonian Construction
 
@@ -44,7 +44,7 @@ Rationale: On a $d$-dimensional manifold, $g$ has rank $d$, so $E-d$ eigenvalues
 
 ---
 
-## Optimization Methods
+## Optimization Methods (`src/training.py`)
 
 All methods minimize $\mathcal{L} = \frac{1}{N}\sum_{i=1}^N \|y^{(i)} - x^{(i)}\|^2 + \lambda \|A\|_F^2$.
 
@@ -76,7 +76,7 @@ Fastest iteration but may stall far from optimum.
 
 ---
 
-## Matrix Parametrization
+## Matrix Parametrization (`src/models.py`)
 
 Hermitian matrices have $H^2$ real degrees of freedom. Two parametrizations:
 
@@ -101,7 +101,7 @@ All coefficients $c_k \in \mathbb{R}$.
 
 ---
 
-## Datasets (`datasets_jax.py`)
+## Datasets (`src/data.py`)
 
 All functions return arrays of shape `(N_points, E_dim)`.
 

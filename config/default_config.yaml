@@ -1,0 +1,16 @@
+experiment:
+  solver: "LBFGS"
+  dataset_type: "sphere"
+  parametrization: "upper"
+  N_points: 1000
+  H_dim: 16
+  epochs: 100
+  A_init_scale: 5.0
+  learning_rate: 0.9
+  l2_lambda: 1e-4
+  seed: 137
+  noise_levels: [0.0, 0.1, 0.2]
+  output_dir: "plots"
+  grad_clip_norm: 1.0      # only for optax
+  transition_steps: 25     # only for optax
+  decay_rate: 0.99         # only for optax

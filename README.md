@@ -56,12 +56,12 @@ See `gradient.pdf` for the analytic gradient derivation.
 
 
 ## Dependencies
+This project uses `uv` for dependency management.
 
 ```bash
-pip install jax jaxlib jaxopt optax matplotlib numpy
+uv sync
 ```
 
-For GPU/TPU: see [JAX installation](https://jax.readthedocs.io/en/latest/installation.html).
 
 
 ## Usage
@@ -70,65 +70,47 @@ The main library is contained in `qcml.py`.
 
 ### Running the Script
 
-You can run the script directly using Python to execute a standard experiment:
+You can run the reproduction script using `uv`:
 
 ```bash
-python qcml.py
+uv run main.py
 ```
+
+This will run experiments as configured in `config/default_config.yaml`.
 
 ### Library Usage
 
-You can also import the `run_experiment` function to run custom experiments:
+You can also import the `run_experiment` function from `main_reproduction.py` to run custom experiments programmatically:
 
 ```python
 import jax
-from qcml import run_experiment
+import yaml
+from main import run_experiment
 
-# Experiment Configuration
-key = jax.random.PRNGKey(42)
-solver = "jaxopt"           # Options: "analytic", "jaxopt", "optax", "pseudo"
-dataset_type = "sphere"     # Options: "sphere", "cubic", "campadelli_beta", etc.
-noise_level = 0.01
+# Load base config
+with open("config/default_config.yaml", "r") as f:
+    config = yaml.safe_load(f)["experiment"]
 
-# Dimensions
-N_points = 100              # Number of data points
-H_dim = 4                   # Hilbert space dimension
-E_dim = 3                   # Embedding dimension (data dimension)
+# Override params
+config["solver"] = "jaxopt"
+config["dataset_type"] = "sphere"
+config["epochs"] = 1000
 
-# Training Hyperparameters
-num_epochs = 1000
-lr = 0.01
-l2_lambda = 0.001
-
-# Run Experiment
-results = run_experiment(
-    key=key,
-    solver=solver,
-    dataset_type=dataset_type,
-    noise_level=noise_level,
-    parametrization="upper", # Options: "upper", "pauli"
-    N_points=N_points,
-    H_dim=H_dim,
-    E_dim=E_dim,
-    num_epochs=num_epochs,
-    A_init_scale=0.1,
-    lr=lr,
-    l2_lambda=l2_lambda,
-    grad_clip_norm=1.0,      # For optax
-    transition_steps=500,    # For optax schedule
-    decay_rate=0.9           # For optax schedule
-)
-
-# Results contain: (Intrinsic Dim Array, Embeddings, Ground State Energies, Metric Eigenvalues)
-I_dims, Y_embed, E0s, G_eigs = results
-print("Estimated Intrinsic Dimension:", I_dims.mean())
+# Run
+run_experiment(config, noise_level=0.01, seed=42)
 ```
 
 
 ## Files
 
-- `qcml.py`: Core implementation (parametrizations, loss functions, solvers, dimension estimator, plotting)
-- `datasets_jax.py`: Synthetic dataset generators
+- `src/`: Source code directory
+  - `data.py`: Synthetic dataset generators
+  - `models.py`: Parametrizations and quantum metric logic
+  - `loss.py`: Loss functions
+  - `training.py`: Training loops
+  - `plotting.py`: Visualization
+- `config/`: Configuration files (`default_config.yaml`)
+- `main.py`: Main entry point
 - `DOCUMENTATION.md`: Detailed API and logic documentation
 - `plots.pdf`: Benchmark results
 - `gradient.pdf`: Analytic gradient derivation
