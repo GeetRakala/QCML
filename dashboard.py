@@ -7,32 +7,42 @@ import sys
 import argparse
 
 # Import main reproduction logic
-# We need to add the current directory to sys.path to import main
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import main
 
 st.set_page_config(page_title="QCML Dashboard", layout="wide")
-
 st.title("QCML Experiment Dashboard")
 
 # --- Sidebar: Run Experiment ---
 st.sidebar.header("Run New Experiment")
 
 with st.sidebar.form("run_experiment_form"):
+    st.subheader("Core Parameters")
     dataset_type = st.selectbox("Dataset Type", ["sphere", "sphere_other", "cubic", "cubic_other", "campadelli_beta", "campadelli_n"])
     solver = st.selectbox("Solver", ["LBFGS", "analytic", "optax", "pseudo", "jaxopt"])
     parametrization = st.selectbox("Parametrization", ["upper", "pauli"])
     
-    H_dim = st.number_input("H_dim", min_value=1, value=16)
+    H_dim = st.number_input("H_dim (Hilbert Dim)", min_value=1, value=16)
     N_points = st.number_input("N_points", min_value=10, value=1000)
     epochs = st.number_input("Epochs", min_value=1, value=100)
-    
-    col1, col2 = st.columns(2)
-    learning_rate = st.number_input("Learning Rate", value=0.9, format="%.4f")
-    l2_lambda = st.number_input("L2 Lambda", value=1e-4, format="%.1e")
-    
-    noise_level = st.slider("Noise Level", 0.0, 1.0, 0.0, 0.05)
     seed = st.number_input("Seed", value=137)
+
+    st.subheader("Hyperparameters")
+    col1, col2 = st.columns(2)
+    with col1:
+        learning_rate = st.number_input("Learning Rate", value=0.9, format="%.4f")
+        l2_lambda = st.number_input("L2 Lambda", value=1e-4, format="%.1e")
+    with col2:
+        A_init_scale = st.number_input("Init Scale (A)", value=5.0)
+        noise_level = st.slider("Noise Level", 0.0, 1.0, 0.0, 0.05)
+
+    st.subheader("Optax Specific")
+    col3, col4 = st.columns(2)
+    with col3:
+        grad_clip_norm = st.number_input("Grad Clip", value=1.0)
+    with col4:
+        transition_steps = st.number_input("Transition Steps", value=25)
+        decay_rate = st.number_input("Decay Rate", value=0.99)
     
     submitted = st.form_submit_button("Run Experiment")
 
@@ -49,11 +59,10 @@ with st.sidebar.form("run_experiment_form"):
             "noise_level": noise_level,
             "seed": seed,
             "output_dir": "plots",
-            # Defaults for optax or unused params
-            "A_init_scale": 5.0, # You might want to expose this too
-            "grad_clip_norm": 1.0,
-            "transition_steps": 25,
-            "decay_rate": 0.99
+            "A_init_scale": A_init_scale,
+            "grad_clip_norm": grad_clip_norm,
+            "transition_steps": transition_steps,
+            "decay_rate": decay_rate
         }
         
         with st.spinner(f"Running {solver} on {dataset_type}..."):
@@ -80,14 +89,17 @@ def load_experiments(plots_dir="plots"):
                 with open(config_path, "r") as f:
                     config = yaml.safe_load(f)
                 
-                # Flatten useful config items
+                # Robust extraction with type casting
                 row = {
-                    "Dataset": config.get("dataset_type"),
-                    "Solver": config.get("solver"),
-                    "H_dim": config.get("H_dim"),
+                    "Dataset": str(config.get("dataset_type", "unknown")),
+                    "Solver": str(config.get("solver", "unknown")),
+                    "Param": str(config.get("parametrization", "upper")),
+                    "H_dim": int(config.get("H_dim", 0)),
                     "Noise": float(config.get("noise_level", 0.0)),
                     "LR": float(config.get("learning_rate", 0.0)),
                     "L2": float(config.get("l2_lambda", 0.0)),
+                    "Scale": float(config.get("A_init_scale", 0.0)),
+                    "Epochs": int(config.get("epochs", 0)),
                     "Path": root
                 }
                 experiments.append(row)
@@ -97,7 +109,8 @@ def load_experiments(plots_dir="plots"):
     df = pd.DataFrame(experiments)
     if not df.empty:
         # Sort for better readability
-        df = df.sort_values(by=["Dataset", "Solver", "H_dim", "Noise"])
+        sort_cols = [c for c in ["Dataset", "Solver", "H_dim", "Noise"] if c in df.columns]
+        df = df.sort_values(by=sort_cols)
     return df
 
 st.header("Results Browser")
@@ -111,16 +124,15 @@ if df_experiments.empty:
     st.info("No experiments found in `plots/`. Run an experiment from the sidebar!")
 else:
     # Interactive Table
-    # Use st.dataframe with key to allow selection? actually st.dataframe doesn't support select rows easily in older streamlit versions
-    # But new st.dataframe or st.data_editor might. Let's strictly use st.dataframe.
-    # A cleaner way is using st.selectbox to pick an experiment from the list ID
-    
-    # Create a display label
+    # Create a descriptive display label
     df_experiments["ID"] = df_experiments.apply(
-        lambda x: f"{x['Dataset']} | {x['Solver']} | H{x['H_dim']} | Noise {x['Noise']:.2f} | LR {x['LR']} | L2 {x['L2']:.1e}", axis=1
+        lambda x: (f"{x['Dataset']} | {x['Solver']} | {x['Param']} | "
+                   f"H{x['H_dim']} | N{x['Noise']:.2f} | "
+                   f"LR{x['LR']} | L2{x['L2']:.1e} | Sc{x['Scale']}"), axis=1
     )
     
-    selected_exp_id = st.selectbox("Select Experiment to View", df_experiments["ID"].unique())
+    unique_ids = df_experiments["ID"].unique()
+    selected_exp_id = st.selectbox("Select Experiment to View", unique_ids)
     
     if selected_exp_id:
         selected_row = df_experiments[df_experiments["ID"] == selected_exp_id].iloc[0]
@@ -130,8 +142,6 @@ else:
         st.text(f"Path: {exp_path}")
         
         # Display Images
-        # We look for standard filenames: point_cloud.png, mean_eigenvalues.png, I_dim_hist.png
-        
         col1, col2 = st.columns(2)
         
         with col1:

@@ -102,7 +102,9 @@ run_experiment(config, noise_level=0.01, seed=42)
 
 ### Dashboard
 
-You can explore results and run new experiments using the Streamlit dashboard:
+You can explore results and run new experiments using the interactive Streamlit dashboard. It allows you to:
+- **Visualize** experiment results and plots.
+- **Configure** and launch new runs with full parameter control via the sidebar.
 
 ```bash
 uv run streamlit run dashboard.py
