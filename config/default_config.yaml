@@ -1,16 +1,18 @@
 experiment:
-  solver: "LBFGS"
-  dataset_type: "sphere"
+  solver: "LBFGS"            # Can be a list: ["LBFGS", "optax"]
+  dataset_type: "sphere"     # Can be a list: ["sphere", "cubic"]
   parametrization: "upper"
   N_points: 1000
-  H_dim: 16
+  H_dim: [16]                # List example: [8, 16, 32] will run 3 experiments
   epochs: 100
   A_init_scale: 5.0
-  learning_rate: 0.9
-  l2_lambda: 1e-4
+  learning_rate: [0.9]       # List example: [0.1, 0.9]
+  l2_lambda: 1e-4            # Can be specific like [1e-4, 1e-3]
   seed: 137
-  noise_levels: [0.0, 0.1, 0.2]
+  noise_levels: [0.0, 0.1, 0.2] # This is treated as a sweep parameter "noise_level"
   output_dir: "plots"
-  grad_clip_norm: 1.0      # only for optax
-  transition_steps: 25     # only for optax
-  decay_rate: 0.99         # only for optax
+  
+  # Optax specific
+  grad_clip_norm: 1.0      
+  transition_steps: 25     
+  decay_rate: 0.99         

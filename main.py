@@ -18,20 +18,24 @@ from src.plotting import (
     plot_I_dim_array, plot_I_dim_array_hist
 )
 
-def run_experiment(config, noise_level, seed):
+def run_experiment(run_config):
     """Run a single experiment configuration."""
-    solver = config['solver']
-    dataset_type = config['dataset_type']
-    parametrization = config['parametrization']
-    N_points = config['N_points']
-    H_dim = config['H_dim']
-    num_epochs = config['epochs']
-    A_init_scale = config['A_init_scale']
-    lr = config['learning_rate']
-    l2_lambda = float(config['l2_lambda']) # Ensure float
-    grad_clip_norm = config.get('grad_clip_norm', 1.0)
-    transition_steps = config.get('transition_steps', 25)
-    decay_rate = config.get('decay_rate', 0.99)
+    # Extract parameters
+    solver = run_config['solver']
+    dataset_type = run_config['dataset_type']
+    parametrization = run_config['parametrization']
+    N_points = run_config['N_points']
+    H_dim = run_config['H_dim']
+    num_epochs = run_config['epochs']
+    A_init_scale = run_config['A_init_scale']
+    lr = run_config['learning_rate']
+    l2_lambda = float(run_config['l2_lambda'])
+    noise_level = run_config['noise_level']
+    seed = run_config['seed']
+
+    grad_clip_norm = run_config.get('grad_clip_norm', 1.0)
+    transition_steps = run_config.get('transition_steps', 25)
+    decay_rate = run_config.get('decay_rate', 0.99)
 
     dataset_dims = {
         "sphere": 3,
@@ -41,35 +45,35 @@ def run_experiment(config, noise_level, seed):
         "campadelli_beta": 40,
         "campadelli_n": 72
     }
-    E_dim = dataset_dims[dataset_type]
+    E_dim = dataset_dims.get(dataset_type, 3) # Default to 3 if unknown
 
-    
-    # Best practice: Hierarchical structure for easy navigation
-    # plots/dataset_type/solver/H16/noise_0.00
+    # Hierarchical structure:
+    # plots/dataset/solver/H{}_lr{}_l2{}/noise_{}
+    param_str = f"H{H_dim}_lr{lr}_l2{l2_lambda:.1e}"
     save_folder = os.path.join(
-        config['output_dir'], 
+        run_config.get('output_dir', 'plots'), 
         dataset_type, 
         solver, 
-        f"H{H_dim}", 
+        param_str, 
         f"noise_{noise_level:.2f}"
     )
     os.makedirs(save_folder, exist_ok=True)
+    
+    # Save the specific config for this run
+    with open(os.path.join(save_folder, "config.yaml"), "w") as f:
+        yaml.dump(run_config, f)
+
     print("-" * 50)
-    print(f"Running Experiment: {dataset_type} (Noise={noise_level}) with {solver}")
+    print(f"Running Experiment:")
+    print(f"  Dataset: {dataset_type}, Solver: {solver}")
+    print(f"  Params: H={H_dim}, lr={lr}, l2={l2_lambda}")
+    print(f"  Noise: {noise_level}")
 
     key = jax.random.PRNGKey(seed)
     key, subkey_data, subkey_init = jax.random.split(key, 3)
 
     # Generate data
     gen_data = get_data_generator(dataset_type)
-    # The generator kwargs might need adjustment based on dataset type if defaults are not enough
-    # but the defaults seem consistent with qcml.py usage.
-    # For now, we assume defaults in get_data_generator handle E_dim if passed or defaults.
-    # Actually, E_dim is constant per dataset type in qcml.py main block map.
-    # Let's pass E_dim explicitly if the generator accepts it.
-    
-    # We need to inspect signature or just pass what we know.
-    # In src/data.py, gen_sphere_data takes E_dim.
     X_array = gen_data(subkey_data, N_points, E_dim=E_dim, noise=noise_level)
 
     # Initialize A_array
@@ -80,12 +84,11 @@ def run_experiment(config, noise_level, seed):
     if parametrization == "upper":
         A_array_init = initialize_A_array_jax(subkey_init, E_dim, H_dim, scale=A_init_scale)
         params_array_init = upper_from_matrix(A_array_init, H_dim)
-        A_array_init_full = A_array_init # For analytic/LBFGS
+        A_array_init_full = A_array_init 
     elif parametrization == "pauli":
         params_array_init = initialize_A_array_pauli_jax(subkey_init, E_dim, H_dim, scale=A_init_scale)
         pauli_basis_tensor = generate_pauli_basis(H_dim)
         if solver in ["analytic", "LBFGS"]:
-             # These need full matrix
              A_array_init_full = jax.vmap(lambda p: matrix_from_pauli_params(p, H_dim, pauli_basis_tensor))(params_array_init)
 
     # Train
@@ -110,7 +113,7 @@ def run_experiment(config, noise_level, seed):
     else:
         raise ValueError(f"unknown solver: {solver}")
 
-    print("Estimating intrinsic dimension for all points...")
+    print("Estimating intrinsic dimension...")
     I_dim_array, Y_array, E_eigval_0_array, G_eigvals_array = I_dimension_estimator_jax(X_array, A_array_opt)
     
     # Convert to numpy for plotting
@@ -122,11 +125,17 @@ def run_experiment(config, noise_level, seed):
 
     print("Generating plots...")
     plot_point_cloud(Y_array_np, X_array_np, E_eigval_0_array_np, noise_level, solver, dataset_type, save=True,
-                     filename=os.path.join(save_folder, f"point_cloud_noise_{noise_level:.2f}.png"))
+                     filename=os.path.join(save_folder, f"point_cloud.png"))
     plot_mean_eigenvalues(G_eigvals_array_np, noise_level, solver, dataset_type, save=True,
-                          filename=os.path.join(save_folder, f"mean_eigenvalues_noise_{noise_level:.2f}.png"))
-    print(f"Plots saved to {save_folder}")
+                          filename=os.path.join(save_folder, f"mean_eigenvalues.png"))
+    # Save I_dim histogram too as it's useful
+    plot_I_dim_array_hist(I_dim_array_np, noise_level, save=True,
+                          filename=os.path.join(save_folder, f"I_dim_hist.png"))
+    
+    print(f"Results saved to {save_folder}")
     print("-" * 50)
+
+import itertools
 
 def main():
     parser = argparse.ArgumentParser(description="QCML Reproduction Script")
@@ -134,13 +143,47 @@ def main():
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
-        config = yaml.safe_load(f)["experiment"]
+        base_config = yaml.safe_load(f)["experiment"]
 
-    seed = config.get("seed", 137)
-    noise_levels = config.get("noise_levels", [0.0])
+    # Handle parameters that should be grid-searched
+    # We look for lists in the config and create a grid
+    grid_params = {}
+    fixed_params = {}
+    
+    # Helper: ensure everything is a list for iteration if it's meant to be swept
+    # If the user put a list in the yaml, we assume they want to sweep it.
+    # Exception: noise_levels is explicitly plural in the old config, let's map it to noise_level list
+    
+    if "noise_levels" in base_config:
+        base_config["noise_level"] = base_config.pop("noise_levels")
 
-    for noise in noise_levels:
-        run_experiment(config, noise, seed)
+    for k, v in base_config.items():
+        if isinstance(v, list):
+            grid_params[k] = v
+        else:
+            fixed_params[k] = v
+
+    # Create all combinations
+    keys = list(grid_params.keys())
+    values = list(grid_params.values())
+    combinations = list(itertools.product(*values))
+
+    print(f"Found {len(keys)} sweep parameters: {keys}")
+    print(f"Total experiments to run: {len(combinations)}")
+
+    for combo in combinations:
+        # Merge fixed run params with current combo
+        run_config = fixed_params.copy()
+        run_config.update(dict(zip(keys, combo)))
+        
+        # Run
+        try:
+            run_experiment(run_config)
+        except Exception as e:
+            print(f"ERROR running configuration: {dict(zip(keys, combo))}")
+            print(e)
+            import traceback
+            traceback.print_exc()
 
 if __name__ == "__main__":
     main()
