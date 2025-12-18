@@ -69,7 +69,10 @@ uv sync
 
 The easiest way to explore QCML is via the interactive **Streamlit Dashboard**.
 
-![QCML Dashboard](assets/dashboard_screenshot.png)
+<p float="left">
+  <img src="assets/dashboard_screenshot.png" width="45%" />
+  <img src="assets/dashboard_screenshot_2.png" width="45%" /> 
+</p>
 
 It allows you to:
 - **Visualize** experiment results with an interactive, sortable table.
