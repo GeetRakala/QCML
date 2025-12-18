@@ -73,7 +73,6 @@ The easiest way to explore QCML is via the interactive **Streamlit Dashboard**.
 
 It allows you to:
 - **Visualize** experiment results with an interactive, sortable table.
-- **Track Progress** with real-time loss charts and progress bars during training.
 - **Manage** experiments (view configs, delete runs).
 - **Configure** and launch new runs with full parameter control via the sidebar.
 
