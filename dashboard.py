@@ -5,6 +5,7 @@ import yaml
 from PIL import Image
 import sys
 import argparse
+import shutil
 
 # Import main reproduction logic
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -12,9 +13,6 @@ import main
 
 st.set_page_config(page_title="QCML Dashboard", layout="wide")
 st.title("QCML Experiment Dashboard")
-
-# --- Sidebar: Run Experiment ---
-st.sidebar.header("Run New Experiment")
 
 # --- Sidebar: Run Experiment ---
 st.sidebar.header("Run New Experiment")
@@ -34,7 +32,10 @@ dataset_dims_info = {
 }
 if dataset_type in dataset_dims_info:
     e_dim_exp, i_dim_exp = dataset_dims_info[dataset_type]
-    st.sidebar.info(f"**Expected Dims**: E_dim={e_dim_exp}, I_dim={i_dim_exp}")
+    st.sidebar.info(f"""
+    **Embedded dimension** = {e_dim_exp}  
+    **Intrinsic dimension** = {i_dim_exp}
+    """)
 
 solver = st.sidebar.selectbox("Solver", ["LBFGS", "analytic", "optax", "pseudo", "jaxopt"])
 parametrization = st.sidebar.selectbox("Parametrization", ["upper", "pauli"])
@@ -189,3 +190,12 @@ else:
         with st.expander("View Full Config"):
             with open(os.path.join(exp_path, "config.yaml"), "r") as f:
                 st.code(f.read(), language="yaml")
+        
+        st.divider()
+        if st.button("Delete This Experiment", type="primary"):
+            try:
+                shutil.rmtree(exp_path)
+                st.success(f"Deleted experiment: {selected_exp_id}")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error deleting experiment: {e}")

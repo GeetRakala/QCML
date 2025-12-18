@@ -2,6 +2,27 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
+# Set professional style parameters
+plt.rcParams.update({
+    'font.size': 10,
+    'axes.titlesize': 12,
+    'axes.labelsize': 10,
+    'xtick.labelsize': 8,
+    'ytick.labelsize': 8,
+    'legend.fontsize': 8,
+    'figure.titlesize': 14,
+    'figure.dpi': 300,
+    'grid.alpha': 0.5,
+})
+# Try to use a clean style if available, otherwise fallback to default with above params
+try:
+    plt.style.use('seaborn-v0_8-paper')
+except OSError:
+    try:
+        plt.style.use('ggplot')
+    except OSError:
+        pass
+
 def plot_point_cloud(Y_array_np, X_array_np, E_eigval_0_array_np, noise_level, solver, dataset_type, save=False, filename=None):
     """
     Plot the point cloud obtained from the embedding together with the original data.
@@ -9,45 +30,61 @@ def plot_point_cloud(Y_array_np, X_array_np, E_eigval_0_array_np, noise_level, s
     E_dim = Y_array_np.shape[1]
     num_pairs = E_dim // 2
 
-    E_eigval_0_norm = (E_eigval_0_array_np - np.min(E_eigval_0_array_np)) / (
-        np.max(E_eigval_0_array_np) - np.min(E_eigval_0_array_np) + 1e-8
-    )
+    # Avoid division by zero in normalization
+    min_val = np.min(E_eigval_0_array_np)
+    max_val = np.max(E_eigval_0_array_np)
+    if max_val - min_val < 1e-8:
+        E_eigval_0_norm = np.zeros_like(E_eigval_0_array_np)
+    else:
+        E_eigval_0_norm = (E_eigval_0_array_np - min_val) / (max_val - min_val)
 
+    # Calculate layout: rectangular grid close to square total shape
     ncols = int(np.ceil(np.sqrt(num_pairs)))
     nrows = int(np.ceil(num_pairs / ncols))
 
-    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 5, nrows * 5))
+    # Figure size: Scale with number of plots but keep feasible
+    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 4, nrows * 4), constrained_layout=True)
+    if num_pairs == 1:
+        axes = np.array([axes])
     axes = np.array(axes).flatten()
 
     for i in range(num_pairs):
         dim1 = 2 * i
         dim2 = 2 * i + 1
         ax = axes[i]
-        ax.scatter(Y_array_np[:, dim1], Y_array_np[:, dim2], c=1 - E_eigval_0_norm,
-                   cmap='viridis', label='Point Cloud', s=25)
+        
+        # Plot embedded points
+        scatter = ax.scatter(Y_array_np[:, dim1], Y_array_np[:, dim2], c=1 - E_eigval_0_norm,
+                   cmap='magma', label='Embedded', s=15, alpha=0.8, edgecolors='none')
 
+        # Plot original data (projected) if available, lighter
         if X_array_np is not None:
-            ax.scatter(X_array_np[:, dim1], X_array_np[:, dim2], color='red',
-                       alpha=0.4, label='Original Data', s=5)
+             # Ensure dims exist
+             if X_array_np.shape[1] > dim2:
+                ax.scatter(X_array_np[:, dim1], X_array_np[:, dim2], color='cyan',
+                           alpha=0.2, label='Original', s=5)
 
-        ax.set_xlabel(f"$y({dim1+1})$")
-        ax.set_ylabel(f"$y({dim2+1})$")
-        ax.set_title(f"Dimensions {dim1 + 1} vs {dim2 + 1}")
-        ax.grid(True)
-        ax.legend(loc='upper left')
+        ax.set_xlabel(f"$y_{{{dim1+1}}}$")
+        ax.set_ylabel(f"$y_{{{dim2+1}}}$")
+        ax.set_title(f"Dims {dim1 + 1} vs {dim2 + 1}")
+        ax.grid(True, linestyle='--', alpha=0.5)
+        
+        # Add legend only to the first plot to avoid clutter
+        if i == 0:
+            ax.legend(loc='upper right', frameon=True)
 
         # Ensure perfect square aspect ratio
         ax.set_aspect('equal', adjustable='box')
 
+    # Remove empty axes
     for i in range(num_pairs, len(axes)):
         fig.delaxes(axes[i])
 
-    plt.suptitle(f"Point Cloud (Noise = {noise_level}) \n [Dataset: {dataset_type}, Solver: {solver}]", fontsize=16)
-    plt.tight_layout(rect=[0, 0.03, 1, 0.93])
+    plt.suptitle(f"Point Cloud (Noise={noise_level} | {dataset_type} | {solver})", fontweight='bold')
 
     if save and filename:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
-        plt.savefig(filename, bbox_inches='tight')
+        plt.savefig(filename, dpi=300) # High resolution
         plt.close()
     else:
         plt.show()
@@ -56,26 +93,41 @@ def plot_mean_eigenvalues(G_eigvals_array_np, noise_level, solver, dataset_type,
     """Plot the mean eigenvalues of the quantum metric over all data points with error bars."""
     mean_eigs = np.mean(G_eigvals_array_np, axis=0)
     std_eigs = np.std(G_eigvals_array_np, axis=0)
-    indices = np.arange(len(mean_eigs))
-    fig, ax1 = plt.subplots(figsize=(8, 5))
-    err_line1 = ax1.errorbar(indices, mean_eigs, yerr=std_eigs, fmt='o', capsize=5,
-                             label='Linear Scale')
+    indices = np.arange(1, len(mean_eigs) + 1) # 1-based indexing for eigenvalues
+
+    fig, ax1 = plt.subplots(figsize=(8, 5), constrained_layout=True)
+    
+    # Linear scale
+    ax1.errorbar(indices, mean_eigs, yerr=std_eigs, fmt='-o', capsize=4,
+                 label='Linear Scale', color='tab:blue', linewidth=1.5, markersize=5)
     ax1.set_xlabel("Eigenvalue Index")
-    ax1.set_ylabel("Mean Eigenvalue (Linear)")
-    ax1.grid(True)
+    ax1.set_ylabel("Mean Eigenvalue (Linear)", color='tab:blue')
+    ax1.tick_params(axis='y', labelcolor='tab:blue')
+    ax1.grid(True, which='major', linestyle='-', alpha=0.6)
+    ax1.set_xticks(indices)
+
+    # Log scale
     ax2 = ax1.twinx()
-    err_line2 = ax2.errorbar(indices, mean_eigs, yerr=std_eigs, fmt='s', capsize=5, alpha=0.3,
-                             color='black', label='Log Scale')
-    ax2.set_yscale('log')
-    ax2.set_ylabel("Mean Eigenvalue (Log)")
-    ax1.set_title(f"Mean Quantum Metric Eigenvalues (Noise = {noise_level}) \n [Dataset: {dataset_type},Solver: {solver}]")
-    h1, l1 = ax1.get_legend_handles_labels()
-    h2, l2 = ax2.get_legend_handles_labels()
-    ax1.legend(h1 + h2, l1 + l2, loc='best')
-    plt.tight_layout()
+    # Filter out zeros for log plot
+    mask = mean_eigs > 1e-12
+    if np.any(mask):
+        ax2.errorbar(indices[mask], mean_eigs[mask], yerr=std_eigs[mask], fmt='--s', capsize=4,
+                     color='tab:gray', label='Log Scale', alpha=0.6)
+        ax2.set_yscale('log')
+    
+    ax2.set_ylabel("Mean Eigenvalue (Log)", color='tab:gray')
+    ax2.tick_params(axis='y', labelcolor='tab:gray')
+
+    ax1.set_title(f"Metric Eigenvalues (Noise={noise_level})", fontweight='bold')
+    
+    # Combined legend
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
+
     if save and filename:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
-        plt.savefig(filename)
+        plt.savefig(filename, dpi=300)
         plt.close()
     else:
         plt.show()
@@ -85,19 +137,25 @@ def plot_quantum_metric_spectra(G_eigvals_array, noise_level, save=False, filena
     G_eigvals_array_np = np.array(G_eigvals_array)
     num_points = G_eigvals_array_np.shape[0]
     E_dim = G_eigvals_array_np.shape[1]
-    plt.figure(figsize=(8, 5))
-    markers = ['o', 's', '^', 'v', 'D', 'x', '*', 'p', 'h', '<', '>']
+    
+    plt.figure(figsize=(10, 6), constrained_layout=True)
+    
+    # Use distinct colors
+    colors = plt.cm.tab20(np.linspace(0, 1, E_dim))
+    
     for i in range(E_dim):
-        marker = markers[i % len(markers)]
-        plt.plot(range(num_points), G_eigvals_array_np[:, i], marker=marker, markersize=4, linestyle='-', label=f"Eigenvalue {i}")
-    plt.title(f"Quantum Metric Spectra (Noise = {noise_level})")
+        plt.plot(range(num_points), G_eigvals_array_np[:, i], 
+                 marker=None, linewidth=1.0, color=colors[i], label=f"$\lambda_{{{i+1}}}$")
+
+    plt.title(f"Metric Spectra (Noise={noise_level})", fontweight='bold')
     plt.xlabel("Data Point Index")
-    plt.ylabel("Eigenvalues of $g(x)$")
-    plt.legend()
-    plt.grid(True)
+    plt.ylabel("Eigenvalues")
+    plt.legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0.)
+    plt.grid(True, alpha=0.5)
+
     if save and filename:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
-        plt.savefig(filename)
+        plt.savefig(filename, dpi=300)
         plt.close()
     else:
         plt.show()
@@ -105,20 +163,26 @@ def plot_quantum_metric_spectra(G_eigvals_array, noise_level, save=False, filena
 def plot_I_dim_array(I_dim_array, noise_level, save=False, filename=None):
     """Plot the intrinsic dimension estimates as a function of the data point index."""
     I_dim_array_np = np.array(I_dim_array)
-    plt.figure(figsize=(8, 5))
+    plt.figure(figsize=(8, 4), constrained_layout=True)
     indices = range(len(I_dim_array_np))
-    plt.plot(indices, I_dim_array_np, marker='o', linestyle='-', label='Intrinsic Dimension Estimate')
-    plt.title(f"Intrinsic Dimension Estimates (Noise = {noise_level})")
+    
+    plt.plot(indices, I_dim_array_np, marker='o', markersize=2, linestyle='-', linewidth=0.5, 
+             color='tab:purple', label='I_dim Estimate')
+    
+    plt.title(f"I_dim Trace (Noise={noise_level})", fontweight='bold')
     plt.xlabel("Data Point Index")
-    plt.ylabel("Estimated Intrinsic Dimension")
-    unique_dims = np.unique(I_dim_array_np)
-    if np.all(np.mod(unique_dims, 1) == 0):
-         plt.yticks(np.arange(int(min(unique_dims)), int(max(unique_dims)) + 1))
-    plt.legend()
-    plt.grid(True)
+    plt.ylabel("Est. Dimension")
+    
+    # Integer ticks for y-axis if range is small
+    unique_dims = np.unique(np.round(I_dim_array_np))
+    if len(unique_dims) < 20:
+         plt.yticks(np.arange(int(unique_dims.min()), int(unique_dims.max()) + 1))
+    
+    plt.grid(True, alpha=0.5)
+
     if save and filename:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
-        plt.savefig(filename)
+        plt.savefig(filename, dpi=300)
         plt.close()
     else:
         plt.show()
@@ -127,21 +191,29 @@ def plot_I_dim_array_hist(I_dim_array, noise_level, save=False, filename=None):
     """Plot a histogram of the intrinsic dimension estimates."""
     d_vals = np.array(I_dim_array)
     if len(d_vals) == 0:
-        print("Warning: I_dim_array is empty, skipping histogram plot.")
         return
-    min_d = d_vals.min()
-    max_d = d_vals.max()
+        
+    min_d = np.floor(d_vals.min())
+    max_d = np.ceil(d_vals.max())
+    
+    # Center bins on integers
     bins = np.arange(min_d - 0.5, max_d + 1.5, 1)
-    plt.figure(figsize=(8, 5))
-    plt.hist(d_vals, bins=bins, edgecolor='black', rwidth=0.8, alpha=0.75)
-    plt.title(f"Histogram of Intrinsic Dimension Estimates (Noise = {noise_level})")
+
+    plt.figure(figsize=(8, 5), constrained_layout=True)
+    n, bins, patches = plt.hist(d_vals, bins=bins, color='tab:blue', 
+                                edgecolor='black', alpha=0.8, rwidth=0.85)
+
+    plt.title(f"I_dim Distribution (Noise={noise_level})", fontweight='bold')
     plt.xlabel("Estimated Intrinsic Dimension")
     plt.ylabel("Count")
-    plt.xticks(np.arange(int(min_d), int(max_d) + 1, 1))
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    
+    # Set x-ticks to be integers
+    plt.xticks(np.arange(min_d, max_d + 1, 1))
+    plt.grid(axis='y', linestyle='--', alpha=0.5)
+
     if save and filename:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
-        plt.savefig(filename)
+        plt.savefig(filename, dpi=300)
         plt.close()
     else:
         plt.show()
