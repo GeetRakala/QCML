@@ -142,28 +142,33 @@ df_experiments = load_experiments()
 if df_experiments.empty:
     st.info("No experiments found in `plots/`. Run an experiment from the sidebar!")
 else:
-    # Interactive Table
-    # Create a descriptive display label
-    def generate_label(x):
-        label = (f"{x['Dataset']} | {x['Solver']} | {x['Param']} | "
-                 f"H_dim: {x['H_dim']} | Noise: {x['Noise']:.2f} | "
-                 f"LearnRate: {x['LR']} | L2_Lambda: {x['L2']:.1e} | InitScale: {x['Scale']} | "
-                 f"Epochs: {x['Epochs']} | Points: {x['N_points']}")
-        if x['Solver'] == 'optax':
-            label += f" | T_steps: {x['T_steps']} | Decay: {x['Decay']}"
-        return label
-
-    df_experiments["ID"] = df_experiments.apply(generate_label, axis=1)
+    # Interactive Table with Selection
+    st.subheader("Select Experiment")
     
-    unique_ids = df_experiments["ID"].unique()
-    selected_exp_id = st.selectbox("Select Experiment to View", unique_ids)
+    # Configure grid options
+    grid_df = df_experiments.drop(columns=["Path"]).copy()
     
-    if selected_exp_id:
-        selected_row = df_experiments[df_experiments["ID"] == selected_exp_id].iloc[0]
+    # Use st.dataframe with selection
+    selection = st.dataframe(
+        grid_df,
+        use_container_width=True,
+        hide_index=True,
+        on_select="rerun",
+        selection_mode="single-row",
+        height=300
+    )
+    
+    # Access the selection state correctly
+    selected_indices = selection.selection.rows
+    
+    if selected_indices:
+        index = selected_indices[0]
+        selected_row = df_experiments.iloc[index]
         exp_path = selected_row["Path"]
         
-        st.subheader(f"Results for: {selected_exp_id}")
-        st.text(f"Path: {exp_path}")
+        st.divider()
+        st.subheader(f"Results for: {selected_row['Dataset']} ({selected_row['Solver']})")
+        st.caption(f"Path: {exp_path}")
         
         # Display Images
         col1, col2 = st.columns(2)
@@ -185,6 +190,10 @@ else:
                 st.image(Image.open(me_path), caption="Mean Eigenvalues (Quantum Metric)")
             else:
                 st.warning("mean_eigenvalues.png not found")
+            
+            qm_path = os.path.join(exp_path, "quantum_metric_spectra.png")
+            if os.path.exists(qm_path):
+                st.image(Image.open(qm_path), caption="Quantum Metric Spectra")
 
         # Show raw config
         with st.expander("View Full Config"):
@@ -195,7 +204,9 @@ else:
         if st.button("Delete This Experiment", type="primary"):
             try:
                 shutil.rmtree(exp_path)
-                st.success(f"Deleted experiment: {selected_exp_id}")
+                st.success(f"Deleted experiment")
                 st.rerun()
             except Exception as e:
                 st.error(f"Error deleting experiment: {e}")
+    else:
+        st.info("👆 Select an experiment from the table above to view details.")
