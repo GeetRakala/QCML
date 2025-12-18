@@ -100,6 +100,14 @@ config["epochs"] = 1000
 run_experiment(config, noise_level=0.01, seed=42)
 ```
 
+### Dashboard
+
+You can explore results and run new experiments using the Streamlit dashboard:
+
+```bash
+uv run streamlit run dashboard.py
+```
+
 
 ## Files
 
@@ -111,6 +119,7 @@ run_experiment(config, noise_level=0.01, seed=42)
   - `plotting.py`: Visualization
 - `config/`: Configuration files (`default_config.yaml`)
 - `main.py`: Main entry point
+- `dashboard.py`: Streamlit experiment dashboard
 - `DOCUMENTATION.md`: Detailed API and logic documentation
 - `plots.pdf`: Benchmark results
 - `gradient.pdf`: Analytic gradient derivation
