@@ -6,17 +6,19 @@
 
 ## Overview
 
-This repository implements an intrinsic dimension estimator based on quantum geometric methods. The approach constructs a set of Hermitian operators ${A_\mu}$ that encode the local geometry of a data manifold embedded in high-dimensional space. Each data point is mapped to the ground state of an error Hamiltonian, and the intrinsic dimension is extracted from the eigenvalue spectrum of the quantum metric tensor.
+Intrinsic dimension estimator using quantum geometric methods. Maps data points to ground states of error Hamiltonians and extracts dimension from the eigenvalue spectrum of the quantum metric tensor.
 
-The implementation uses JAX for automatic differentiation and XLA compilation, enabling execution on CPU, GPU, and TPU backends.
-
-This is an open-source reproduction of methods from:
-> [A quantum cognition approach to intrinsic dimension estimation](https://www.nature.com/articles/s41598-025-91676-8) (Scientific Reports, 2025)
+Built using JAX (natively supports GPU/TPU acceleration).
 
 > [!NOTE]
-> For a detailed technical reference of the codebase, see **[DOCUMENTATION.md](DOCUMENTATION.md)**.
+> For Apple Silicon GPU acceleration, install `jax-metal`: `uv pip install jax-metal`
 
-## Implementation Details
+Open-source reproduction of methods from:
+> [A quantum cognition approach to intrinsic dimension estimation](https://www.nature.com/articles/s41598-025-91676-8) (Scientific Reports, 2025)
+
+Technical documentation: **[DOCUMENTATION.md](DOCUMENTATION.md)**
+
+## Implementation
 
 **Optimization Methods:**
 - `analytic`: Full analytic gradient via eigenvalue perturbation theory
@@ -33,71 +35,84 @@ This is an open-source reproduction of methods from:
 - Hypercube boundaries (`cubic`, `cubic_other`)
 - Campadelli benchmark manifolds (`campadelli_beta`, `campadelli_n`)
 
-
 ## Method
 
-Given a dataset of $N$ points $x \in \mathbb{R}^E$, the method learns a set of Hermitian matrices $A_\mu$ (for $\mu=1 \dots E$) of dimension $H \times H$ by minimizing the reconstruction error.
+Given $N$ points $x \in \mathbb{R}^E$, learn Hermitian matrices $A_\mu$ (for $\mu=1 \dots E$) of dimension $H \times H$ by minimizing reconstruction error.
 
-For each data point $x$, the **error Hamiltonian** is:
+**Error Hamiltonian** for each point:
 
 $$ H_E(x) = \frac{1}{2}\sum_{\mu=1}^E (A_\mu - x_\mu I)^2 $$
 
-The ground state $|\psi_0(x)\rangle$ satisfies $H_E(x)|\psi_0(x)\rangle = E_0|\psi_0(x)\rangle$ where $E_0$ is the minimum eigenvalue.
+Ground state $|\psi_0(x)\rangle$ satisfies $H_E(x)|\psi_0(x)\rangle = E_0|\psi_0(x)\rangle$.
 
-The reconstruction is $y_\mu = \langle \psi_0 | A_\mu | \psi_0 \rangle$, and the loss is $L = \sum_i ||y^{(i)} - x^{(i)}||^2$.
+Reconstruction: $y_\mu = \langle \psi_0 | A_\mu | \psi_0 \rangle$
 
-The **quantum metric** is computed from excited state contributions:
+Loss: $L = \sum_i ||y^{(i)} - x^{(i)}||^2$
+
+**Quantum metric** from excited states:
 
 $$ g_{\mu\nu} = 2 \text{Re} \sum_{n \geq 1} \frac{\langle \psi_0 | A_\mu | \psi_n \rangle \langle \psi_n | A_\nu | \psi_0 \rangle}{E_n - E_0} $$
 
-The intrinsic dimension is estimated from the spectrum of $g$ by identifying the spectral gap where eigenvalues transition from $O(1)$ to $O(\epsilon)$.
+Intrinsic dimension estimated from spectrum of $g$ by identifying the spectral gap where eigenvalues drop from $O(1)$ to $O(\epsilon)$.
 
-See `gradient.pdf` for the analytic gradient derivation.
+Analytic gradient derivation: `gradient.pdf`
 
+## Quick Start
 
-## Dependencies
-This project uses `uv` for dependency management.
+1. **Clone the repository:**
+```bash
+git clone https://github.com/GeetRakala/QCML.git
+cd QCML
+```
 
+2. **Install uv** (if not already installed):
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+3. **Initialize dependencies:**
 ```bash
 uv sync
 ```
 
+4. **Launch the dashboard:**
+```bash
+uv run streamlit run dashboard.py
+```
+
+The dashboard will open in your browser. First launch will take a few minutes while dependencies are compiled.
 
 ## Usage
 
-### Dashboard (Recommended)
+### Dashboard
 
-The easiest way to explore QCML is via the interactive **Streamlit Dashboard**.
+Interactive Streamlit interface for running and visualizing experiments:
 
 <p float="left">
   <img src="assets/dashboard_screenshot.png" width="45%" />
   <img src="assets/dashboard_screenshot_2.png" width="45%" /> 
 </p>
 
-It allows you to:
-- **Visualize** experiment results with an interactive, sortable table.
-- **Manage** experiments (view configs, delete runs).
-- **Configure** and launch new runs with full parameter control via the sidebar.
-
-**Run the dashboard:**
+Features:
+- Sortable experiment results table
+- Experiment management (view configs, delete runs)
+- Launch new runs with sidebar parameter controls
 
 ```bash
 uv run streamlit run dashboard.py
 ```
 
-### Command Line Usage
+### Command Line
 
-You can also run the reproduction script directly using `uv`:
+Run experiments from `config/default_config.yaml`:
 
 ```bash
 uv run main.py
 ```
 
-This will run experiments as configured in `config/default_config.yaml`.
+### Library Import
 
-### Library Usage
-
-You can also import the `run_experiment` function from `main.py` into a jupyter notebook to run custom experiments:
+Use in Jupyter notebooks:
 
 ```python
 import jax
@@ -117,12 +132,11 @@ config["epochs"] = 1000
 run_experiment(config, noise_level=0.01, seed=42)
 ```
 
-Results are saved to `plots/` with a hierarchical structure. Each run gets a unique directory based on its configuration hash to prevent overwrites.
-
+Results saved to `plots/` with hierarchical structure. Each run gets a unique directory based on configuration hash.
 
 ## Files
 
-- `src/`: Source code directory
+- `src/`: Source code
   - `data.py`: Synthetic dataset generators
   - `models.py`: Parametrizations and quantum metric logic
   - `loss.py`: Loss functions
@@ -132,9 +146,8 @@ Results are saved to `plots/` with a hierarchical structure. Each run gets a uni
 - `main.py`: Main entry point
 - `dashboard.py`: Streamlit experiment dashboard
 - `DOCUMENTATION.md`: Detailed API and logic documentation
-- `plots.pdf`: Benchmark results
+- `plots.pdf`: Benchmark results (contains sample experiments)
 - `gradient.pdf`: Analytic gradient derivation
-
 
 ## References
 
@@ -143,7 +156,7 @@ Results are saved to `plots/` with a hierarchical structure. Each run gets a uni
 
 ## License
 
-This project is licensed under the **MIT License**.
+MIT License
 
 ## Author
 
